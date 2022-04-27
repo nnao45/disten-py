@@ -19,7 +19,7 @@ from typing import List
 import sys
 import math
 
-def disten(ser: List[float], m: int, tau: int, B: int) -> float:
+def disten(ser: List[float], m: int = 2, tau: int = 8 , B: int = 512) -> float:
     """
     @param ser: time-series (vector in a column)
     @param m: embedding dimension (scalar)
@@ -28,20 +28,20 @@ def disten(ser: List[float], m: int, tau: int, B: int) -> float:
     """
 
     # rescaling
-    rescaled = list(map(lambda y: y / (max(ser) - min(ser)), list(map(lambda x: x - min(ser), ser))))
+    rescaled = [y / (max(ser) - min(ser) + sys.float_info.epsilon) for y in [x - min(ser) for x in ser]]
 
     # distance matrix
     N = len(rescaled) - (m - 1) * tau
     if N < 0:
         raise(f"ser is too short: {len(ser)}")
     ind = hankel(np.arange(1, N+1), np.arange(N, len(rescaled)+1))
-    rnt = [list(map(lambda z: rescaled[z-1], y)) for y in [x[::tau] for x in ind]]
+    rnt = [[rescaled[z-1] for z in y] for y in [x[::tau] for x in ind]]
     dv = pdist(rnt, 'chebychev')
 
     # esimating probability density by histogram
     num = pd.cut(dv, np.linspace(0, 1, B), include_lowest=True).value_counts().to_numpy()
-    freq = list(map(lambda x: x / num.sum(), num))
+    freq = [x / num.sum() for x in num]
 
     # disten calculation
-    prepared = list(map(lambda y: math.log2(y), list(map(lambda x: x + sys.float_info.epsilon, freq))))
-    return -sum(x * y for (x, y) in zip(prepared, freq)) / math.log2(B)
+    prepared = [math.log2(y) for y in [x + sys.float_info.epsilon for x in freq]]
+    return -sum([x * y for (x, y) in zip(prepared, freq)]) / math.log2(B)
